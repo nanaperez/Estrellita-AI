@@ -1,0 +1,195 @@
+Requisitos globales o variables: 
+matriz_probabilidades[5x5]; se va actualizando, se inicializa con 1/25
+tabla_historico_yo ; va creciendo, columnas: Tipo_Accion, donde, resultado
+tabla_historico_oponente; Tipo_Accion, resultado
+
+//append para agregar item al final de la lista
+//pop extrae y borra el ultimo ultimoElemento de la lista
+
+//matriz_probabilidades = [[1/25, 1/25, 1/25, 1/25, 1/25],
+                           [1/25, 1/25, 1/25, 1/25, 1/25],
+                           [1/25, 1/25, 1/25, 1/25, 1/25],
+                           [1/25, 1/25, 1/25, 1/25, 1/25],
+                           [1/25, 1/25, 1/25, 1/25, 1/25]]
+
+Reglas de juego:
+- Si empiezo primero (primer turno) y es la primera accion: observar (censar)
+- Ideal = solo mover cuando el oponente censa y estoy en amarillo o verde.
+- Ideal = disparar cuando el oponente censa y estoy en anaranjado o rojo.
+- Guardar historico en variables globales y ponerlo en readme.
+- Siempre que el oponente dispara y obtiene punto: 1, es obligatorio moverse.
+- en el resultado_accion; si acertamos (1 punto) y el oponente no se mueve, disparamos al mismo lugar.
+// este es el metodo de juego del agente
+jugador(quienSoy: int, resultado: (int,string,none), Tipo_Accion_oponente: lista(Tipo_Accion:int,parametroAccion:int,resultado: (int,string,none)), mi_posicion:int){
+    // Cuando hay un resultado anterior de la jugada de mi agente
+    si resultado != null entonces
+        // Registro el resultado en el histórico que tengo
+        tabla_historico_yo.ultimoElemento.resultado = resultado
+    si tabla_historico_yo.vacia && Tipo_Accion_oponente == Null entonces
+        //Primera jugada de la partida
+        //Puede ser cualquier cansita
+        casilla_a_censar = Aleatorio(1,25)
+        registrar_Historico_Usuario(tabla_historico_yo, 2,casilla_a_censar)
+        //Retornar censo aleatorio
+        retorne [2, casilla_a_censar]
+    //No soy el primero
+    sino si Tipo_Accion_oponente != None
+        // Hay accion de oponente - registrar
+        registrar_Historico_Oponente(tabla_historico_oponente,Tipo_Accion_oponente[0],
+            Tipo_Accion_oponente[1],Tipo_Accion_oponente[2])
+        //Revisar si corremos
+        si estamos_en_peligro(tabla_historico_oponente)//verificar ultima jugada oponente Hard
+            //Corran Corran!
+            casilla_a_mover = correr_de_aqui(mi_posicion,tabla_historico_oponente)//ML
+            registrar_Historico_Usuario(tabla_historico_yo,3,casilla_a_mover)
+            retorne [3, casilla_a_mover]
+        sino si resultado == 1 && Tipo_Accion_oponente[0] != 3
+            // Si ya le di y no se movio - como a rata - como a cajón que no cierra
+            casilla_de_ataque = tabla_historico_yo.ultimoElemento()[1]
+            registrar_Historico_Usuario(tabla_historico_yo,1,casilla_de_ataque)
+            retorne [1, casilla_de_ataque]
+            // Reviso si puedo atacar
+        sino si Indicio_donde_atacar(tabla_historico_yo,tabla_historico_oponente)//Hard
+            // Atacar
+                casilla_de_ataque = obtener_casilla_ataque(tabla_historico_yo, tabla_historico_oponente)//ML
+                registrar_Historico_Usuario(tabla_historico_yo,1,casilla_de_ataque)
+                retorne [1, casilla_de_ataque]
+        sino 
+            //censar
+            casilla_a_censar2 = censar(tabla_historico_yo,tabla_historico_oponente, matriz_probabilidades)//ML puede ser lógica
+            registrar_Historico_Usuario(tabla_historico_yo,2,casilla_a_censar2)
+            retorne [2, casilla_a_censar]
+    //Prioridad defensa
+}
+//Obtener casilla para censar
+censar(tabla_historico_yo,tabla_historico_oponente, matriz_probabilidades){
+    // censos que me sirven para triangular
+    lista_censos = obtener_lista_censos_disponibles_antes_jugada(tabla_historico_yo, tabla_historico_oponente)
+    // actualizar matriz probabilidades
+    for i = 0; i < matriz_probabilidades.length;++i
+        for j = 0; j < matriz_probabilidades[i].length;++j
+            k = 0
+            continuar = True
+            
+            mientras k < lista_censos.length() && continuar
+                // Cuadrante donde no estan
+                si lista_censos.obtenerElementoEn(k)[2] == "Anaranjado" || == "Rojo" 
+                    si esta_zona_peligro(((i*5)+j+1),lista_censos.obtenerElementoEn(k))
+                        matriz_probabilidades[i][j] = 0
+                //esta cerca
+                sino 
+                    matriz_probabilidades[i][j] = 1
+                    continuar = False;
+                k++
+    // obtener cuantos 1s hay en la matriz
+    cantidad_disponibles_censo= contar_unos(matriz_probabilidades)
+    //Actualizar matriz valores fraccionarios
+    asignar_probabilidad_positiva(matriz_probabilidades,cantidad_disponibles_censo)
+
+    lista_numeros = convertir_a_lista_numeros(matriz_probabilidades) //convierte los que no son 0 a numero y retorna en lista
+    //un aleatorio de la lista
+    retornar obtener_aleatorio_de_lista(lista_numeros)
+}
+// Los censos que sirven antes de que se moviera el oponente
+obtener_lista_censos_disponibles_antes_jugada(tabla_historico_yo, tabla_historico_oponente){
+    lista = []
+    i = tabla_historico_yo.length - 1
+    seguir = True
+    mientras  i >=0 && seguir 
+        si tabla_historico_oponente.obtenerElementoEn(i)[0] == 3
+            seguir == false;
+        Sino si tabla_historico_yo.obtenerElementoEn(i)[0] == 2
+            lista.append(tabla_historico_yo.obtenerElementoEn(i))
+        i--
+    retorne lista
+}
+// donde atacar
+obtener_casilla_ataque(tabla_historico_yo, tabla_historico_oponente){
+    convertir_a_lista_numeros(matriz_probabilidades)
+    retornar obtener_aleatorio_de_lista(lista_numeros)
+}
+//Vale la pena atacar?
+Indicio_donde_atacar(tabla_historico_yo,tabla_historico_oponente){
+    Si tabla_historico_yo.ultimoElemento[0]==2 && (tabla_historico_yo.ultimoElemento[2] == "Verde"|| == "Amarillo")
+        retorne True
+    for i = tabla_historico_yo.length - 1 ; i >= 0;--1
+        si tabla_historico_oponente.obtenerElementoEn(i)[0] != 3
+            si tabla_historico_yo[0] == 2 & && (tabla_historico_yo.ultimoElemento[2] == "Verde"|| == "Amarillo")
+                retorne True
+    Si cantidad_casillas_ataque(matriz_probabilidades)<= 5
+        retorne True
+    retorne False
+}
+cantidad_casillas_ataque(matriz_probabilidades){
+    //contar cuantos valores en matriz_probabilidades son > 0, retornar conteo
+}
+// hacia donde huyo 
+correr_de_aqui(mi_posicion, tabla_historico_oponente){
+    lista_posiciones_validas = obtener_casillas_validas(mi_posicion)//Posiciiones donde me puedo mover, arriba, abajo, izquierda, derecha, teniendo en cuenta mi posicion
+    lista_pesos[lista_posiciones_validas.length]
+    calcular_pesos(lista_posiciones_validas,lista_pesos,tabla_historico_oponente)
+    posicion_donde_ir = obtenerPosicionElementoConMenosPeso(lista_pesos)
+    retorne posicion_donde_ir
+}
+// mientras más pese menos probabilidades de escoger esa casilla.
+calcular_pesos(lista_posiciones_validas, lista_pesos,tabla_historico_oponente){
+    for j=0, j < lista_posiciones_validas.length,j++{ 
+        for i = 0 , i < 3 ,++i{
+            si esta_zona_peligro(lista_posiciones_validas[j],tabla_historico_oponente[length-1-i]) entonces
+                lista_pesos[j]++
+            
+        }
+    }
+}
+// para la lista_pesos
+obtenerPosicionElementoConMenosPeso(lista_pesos){
+    retorne obtenerElMenor(lista_pesos)
+}
+// Estoy en una zona de peligro?
+esta_zona_peligro(posicion,zona_peligro){
+    si (posicion % 5 == 0)
+        izquierda = posicion - 1
+        abajo = posicion + 5
+        arriba = posicion - 5
+        actual = posicion
+        diagonal_arriba_izquierda = posicion - 5 - 1
+        diagonal_abajo_izquierda = posicion + 5 - 1
+        si alguno de estos es == zona_peligro retorne True
+    sino si (posicion es 1, 6, 11, 16 o 21)
+        diagonal_arriba_derecha = posicion - 5 + 1 
+        diagonal_abajo_derecha = posicion + 5 + 1
+        abajo = posicion + 5
+        arriba = posicion - 5
+        actual = posicion
+        derecha = posicion + 1
+        si alguno de estos es == zona_peligro retorne True
+    sino 
+        abajo = posicion + 5
+        arriba = posicion - 5
+        actual = posicion
+        derecha = posicion + 1
+        izquierda = posicion - 1
+        diagonal_arriba_derecha = posicion - 5 + 1 
+        diagonal_abajo_derecha = posicion + 5 + 1
+        diagonal_arriba_izquierda = posicion - 5 - 1
+        diagonal_abajo_izquierda = posicion + 5 - 1
+        si alguno de estos es == zona_peligro retorne True
+}
+//Nos van a atacar?
+estamos_en_peligro(ref tabla_historico_oponente){
+    //TODO se puede mejorar
+    si tabla_historico_oponente.ultimoElemento[0] == 2 
+    && tabla_historico_oponente.ultimoElemento[2] == "Verde" || == "Amarillo"
+        retorne True
+    Si tabla_historico_oponente.ultimoElemento[0] == 1 && tabla_historico_oponente[2] == 1
+        retorne True
+    retorne False
+}
+//Guardar en mi historico
+registrar_Historico_Usuario(ref tabla_historico_yo,  tipo_accion, parametro ){
+    tabla_historico_yo.insertar(new Jugada(tipo, parametro))
+}
+//Guardar en el histórico del oponente.
+registrar_Historico_Oponente(ref tabla_historico_oponente, tipo_accion, parametroAccion, resultado ) {
+     tabla_historico_oponente.insertar(tipo_accion,parametroAccion,resultado)
+}
